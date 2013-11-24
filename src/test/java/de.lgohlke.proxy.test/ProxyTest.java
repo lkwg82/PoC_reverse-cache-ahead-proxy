@@ -1,6 +1,5 @@
 package de.lgohlke.proxy.test;
 
-import lombok.extern.slf4j.Slf4j;
 import org.apache.camel.*;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.http.HttpMessage;
@@ -19,7 +18,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration
 // Put here to prevent Spring context caching across tests and test methods since some tests inherit
