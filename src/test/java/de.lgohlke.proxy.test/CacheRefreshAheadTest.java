@@ -35,8 +35,8 @@ import static org.fest.assertions.api.Assertions.assertThat;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration
-public class CacheTest {
-    private static Logger log = LoggerFactory.getLogger(CacheTest.class);
+public class CacheRefreshAheadTest {
+    private static Logger log = LoggerFactory.getLogger(CacheRefreshAheadTest.class);
 
     // http://terracotta.org/documentation/4.0/bigmemorymax/api/refresh-ahead
 
