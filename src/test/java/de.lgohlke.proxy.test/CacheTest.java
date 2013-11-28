@@ -185,26 +185,35 @@ public class CacheTest {
     }
 
     @Test
-    public void test() throws InterruptedException {
+    public void testRefreshAheadCache() throws InterruptedException {
 
-        AtomicInteger fetchCounter = new AtomicInteger();
+        int fetchCounter = 0;
+        long maxFetchTime =0L;
 
         for (int i = 0; i < 100; i++) {
+            long start = System.currentTimeMillis();
+
             Element x = refreshAheadCache.get("x");
             if (null == x) {
                 log.info("fetch failed");
                 refreshAheadCache.load("x");
             } else {
+                long end = System.currentTimeMillis();
+
+                long duration = end - start;
+                maxFetchTime = Math.max(maxFetchTime,duration);
+
                 log.info("fetched " + x.getHitCount());
-                fetchCounter.getAndIncrement();
+                fetchCounter++;
             }
             TimeUnit.MILLISECONDS.sleep(100);
         }
 
         assertThat(loadCounter.get()).isGreaterThan(3);
-        assertThat(fetchCounter.get()).isGreaterThan(85);
+        assertThat(fetchCounter).isGreaterThan(85);
+        assertThat(maxFetchTime).isLessThan(5);
 
-        log.info("fetchCounter " + fetchCounter.get());
+        log.info("fetchCounter " + fetchCounter);
         log.info("loadCounter  " + loadCounter.get());
     }
 
