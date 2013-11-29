@@ -118,6 +118,7 @@ public class CacheRestartTest {
 
         cacheStore.getElements().add(new Element("test", "test"));
 
+        // invoking lazy loaded bean
         context.getBean("bootstrappingCache");
 
         assertThat(cacheStore.getElements()).hasSize(1);
