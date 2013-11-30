@@ -61,6 +61,8 @@ public class CacheRefreshAheadTest {
             EhCacheFactoryBean cache = new EhCacheFactoryBean();
             cache.setCacheName("test");
             cache.setEternal(true);
+            cache.setTimeToIdle(0);
+            cache.setTimeToLive(0);
             return cache;
         }
 
@@ -175,7 +177,7 @@ public class CacheRefreshAheadTest {
     private AtomicInteger loadCounter;
 
     @Before
-    public void beforeEachTest(){
+    public void beforeEachTest() {
         loadCounter.set(0);
     }
 
@@ -188,7 +190,7 @@ public class CacheRefreshAheadTest {
     public void testRefreshAheadCache() throws InterruptedException {
 
         int fetchCounter = 0;
-        long maxFetchTime =0L;
+        long maxFetchTime = 0L;
 
         for (int i = 0; i < 100; i++) {
             long start = System.currentTimeMillis();
@@ -201,7 +203,7 @@ public class CacheRefreshAheadTest {
                 long end = System.currentTimeMillis();
 
                 long duration = end - start;
-                maxFetchTime = Math.max(maxFetchTime,duration);
+                maxFetchTime = Math.max(maxFetchTime, duration);
 
                 log.info("fetched " + x.getHitCount());
                 fetchCounter++;
