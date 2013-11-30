@@ -1,14 +1,8 @@
 package de.lgohlke.proxy.test;
 
-import net.sf.ehcache.CacheManager;
-import net.sf.ehcache.Ehcache;
-import net.sf.ehcache.Element;
-import net.sf.ehcache.constructs.blocking.CacheEntryFactory;
-import net.sf.ehcache.constructs.blocking.SelfPopulatingCache;
 import org.apache.camel.*;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.cache.CacheConstants;
-import org.apache.camel.component.cache.CacheManagerFactory;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.spring.javaconfig.SingleRouteCamelConfiguration;
 import org.fest.assertions.data.MapEntry;
@@ -57,7 +51,6 @@ public class CamelWithCacheTest {
     private Endpoint testEP;
 
 
-
     @EndpointInject(uri = DEAD_LETTER)
     private MockEndpoint deadEndpoint;
 
@@ -75,77 +68,28 @@ public class CamelWithCacheTest {
         }
 
         @Bean
-        public SelfPopulatingCache selfPopulatingCache(CacheManager cacheManager, CacheEntryFactory cacheEntryFactory) {
-            Ehcache ehcache = cacheManager.getEhcache("sc");
-//            System.out.println(cacheManager.getEhcache("sc"));
-//            System.out.println(cacheManager.getCache("sc"));
-            SelfPopulatingCache selfPopulatingCache = new SelfPopulatingCache(ehcache, cacheEntryFactory);
-//            cacheManager.replaceCacheWithDecoratedCache(ehcache, selfPopulatingCache);
-//            System.out.println(cacheManager.getEhcache("sc"));
-//            System.out.println(cacheManager.getCache("sc"));
-            return selfPopulatingCache;
-        }
-
-        /**
-         * the 'client' which gets the entry into the cache
-         *
-         * @return
-         */
-        @Bean
-        public CacheEntryFactory cacheEntryFactory() {
-            return new CacheEntryFactory() {
-                @Override
-                public Object createEntry(Object key) throws Exception {
-                    return new Element(key, "test");
-                }
-            };
-        }
-
-        @Bean
-        public CacheManager cacheManager() {
-            return CacheManager.create(new net.sf.ehcache.config.Configuration());
-        }
-
-        @Bean
-        public CacheManagerFactory cacheManagerFactory(final CacheManager cacheManager) {
-            return new CacheManagerFactory() {
-                @Override
-                protected CacheManager createCacheManagerInstance() {
-                    return cacheManager;
-                }
-            };
-        }
-
-        @Bean
         public RouteBuilder route() {
             return new RouteBuilder() {
                 public void configure() {
 
-                    String caches = "direct:cachePlexer";
                     String cache = "cache:test?eternal=true&timeToLiveSeconds=0&timeToIdleSeconds=0";
-                    String selfPopulatingCache = "cache:sc?cacheManagerFactory=#cacheManagerFactory&eternal=true&timeToLiveSeconds=0&timeToIdleSeconds=0";
 
                     errorHandler(deadLetterChannel(DEAD_LETTER));
 
                     from(ADD).
                             setHeader(CacheConstants.CACHE_OPERATION, constant(CacheConstants.CACHE_OPERATION_ADD)).
                             setHeader(CacheConstants.CACHE_KEY, header("key")).
-                            to(caches);
+                            to(cache);
 
                     from(GET).
                             setHeader(CacheConstants.CACHE_OPERATION, constant(CacheConstants.CACHE_OPERATION_GET)).
                             setHeader(CacheConstants.CACHE_KEY, header("key")).
-                            to(caches);
+                            to(cache);
 
                     from(CHECK).setHeader(CacheConstants.CACHE_OPERATION, constant(CacheConstants.CACHE_OPERATION_CHECK)).
                             setHeader(CacheConstants.CACHE_KEY, header("key")).
-                            to(caches);
+                            to(cache);
 
-                    from(caches).choice().
-                            when(header("cache").isEqualTo("sc")).to(selfPopulatingCache).
-                            otherwise().to(cache);
-
-                    from("direct:test").to(ADD);
 
                     from(cache).to("mock:result");
                 }
@@ -194,38 +138,5 @@ public class CamelWithCacheTest {
         assertThat(headers).contains(MapEntry.entry(CacheConstants.CACHE_ELEMENT_WAS_FOUND, true));
 
         resultEndpoint.assertIsSatisfied(10, TimeUnit.SECONDS);
-    }
-
-    /**
-     * not running
-     * @throws Exception
-     */
-//    @Test
-    public void testSelfpopulatingCache_get() throws Exception {
-
-        resultEndpoint.expectedMessageCount(1);
-        resultEndpoint.expectedBodiesReceived("test");
-        resultEndpoint.expectedHeaderReceived(CacheConstants.CACHE_KEY, "x");
-
-        Exchange exchangeGet = testEP.createExchange();
-        Message messageGet = exchangeGet.getIn();
-        messageGet.setHeader("key", "x");
-        messageGet.setHeader("cache", "sc");
-//        messageGet.setBody("test");
-
-//        Exchange exchangeCheck = checkEP.createExchange(ExchangePattern.InOut);
-//        Message messageCheck = exchangeCheck.getIn();
-//        messageCheck.setHeader("key", "x");
-//
-//
-//        checkEP.createProducer().process(exchangeCheck);
-        testEP.createProducer().process(exchangeGet);
-
-        System.out.println("xxxxxxxxxxxxx\n");
-        System.out.println( "in  " + exchangeGet.getIn().getHeaders());
-        System.out.println( "out " +exchangeGet.getOut().getHeaders());
-//        System.out.println( exchangeCheck.getOut().getHeaders());
-
-//        resultEndpoint.assertIsSatisfied(10, TimeUnit.SECONDS);
     }
 }
