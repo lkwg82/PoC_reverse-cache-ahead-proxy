@@ -24,10 +24,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -46,14 +43,15 @@ public class CacheRefreshAheadTest {
 
         @Bean
         public EhCacheManagerFactoryBean ehCacheManagerFactoryBean() {
-            return new EhCacheManagerFactoryBean();
+            final EhCacheManagerFactoryBean ehCacheManagerFactoryBean = new EhCacheManagerFactoryBean();
+            ehCacheManagerFactoryBean.setShared(true);
+            ehCacheManagerFactoryBean.setCacheManagerName(new Random().nextLong() + "");
+            return ehCacheManagerFactoryBean;
         }
 
         @Bean
-        public CacheManager cacheManager(EhCacheManagerFactoryBean ehCacheManagerFactoryBean) {
-            EhCacheCacheManager cacheManager = new EhCacheCacheManager();
-            cacheManager.setCacheManager(ehCacheManagerFactoryBean.getObject());
-            return cacheManager;
+        public EhCacheCacheManager cacheManager(EhCacheManagerFactoryBean ehCacheManagerFactoryBean) {
+            return new EhCacheCacheManager(ehCacheManagerFactoryBean.getObject());
         }
 
         @Bean

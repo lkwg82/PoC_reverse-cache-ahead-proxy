@@ -27,6 +27,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.util.HashSet;
+import java.util.Random;
 
 import static org.fest.assertions.api.Assertions.assertThat;
 
@@ -37,20 +38,19 @@ public class CacheRestartTest {
 
     @Configuration
     @EnableCaching
-    public static class ContextConfig{
+    public static class ContextConfig {
 
         @Bean
         public EhCacheManagerFactoryBean ehCacheManagerFactoryBean() {
             final EhCacheManagerFactoryBean ehCacheManagerFactoryBean = new EhCacheManagerFactoryBean();
-            ehCacheManagerFactoryBean.setCacheManagerName(this.getClass().getCanonicalName());
+            ehCacheManagerFactoryBean.setShared(true);
+            ehCacheManagerFactoryBean.setCacheManagerName(new Random().nextLong() + "");
             return ehCacheManagerFactoryBean;
         }
 
         @Bean
         public EhCacheCacheManager cacheManager(EhCacheManagerFactoryBean ehCacheManagerFactoryBean) {
-            EhCacheCacheManager cacheManager = new EhCacheCacheManager();
-            cacheManager.setCacheManager(ehCacheManagerFactoryBean.getObject());
-            return cacheManager;
+            return new EhCacheCacheManager(ehCacheManagerFactoryBean.getObject());
         }
 
         @Bean(name = "bootstrappingCache")
