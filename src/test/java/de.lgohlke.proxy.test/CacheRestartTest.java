@@ -1,13 +1,14 @@
 package de.lgohlke.proxy.test;
 
 import de.lgohlke.proxy.cache.CacheStore;
-import de.lgohlke.proxy.ehcache.CacheStoreAwareBootstrapCacheLoader;
 import de.lgohlke.proxy.cache.CacheStoreImpl;
+import de.lgohlke.proxy.ehcache.CacheStoreAwareBootstrapCacheLoader;
 import de.lgohlke.proxy.ehcache.PersistingCacheEventListener;
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.CacheManager;
 import net.sf.ehcache.Element;
 import net.sf.ehcache.event.CacheEventListener;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,7 +37,7 @@ public class CacheRestartTest {
 
     @Configuration
     @EnableCaching
-    public static class ContextConfig {
+    public static class ContextConfig{
 
         @Bean
         public EhCacheManagerFactoryBean ehCacheManagerFactoryBean() {
@@ -100,6 +101,11 @@ public class CacheRestartTest {
         cacheStore.clear();
         // need to create new one 'cause in some tests a shutdown is invoked
         cacheManager = ehCacheManager.getCacheManager().create();
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        cacheManager.shutdown();
     }
 
     @Test
