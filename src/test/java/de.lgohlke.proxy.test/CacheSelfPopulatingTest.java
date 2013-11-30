@@ -48,7 +48,7 @@ public class CacheSelfPopulatingTest {
         @Bean
         public EhCacheFactoryBean cacheFactoryBean() {
             EhCacheFactoryBean ehCacheFactoryBean = new EhCacheFactoryBean();
-            ehCacheFactoryBean.setCacheName("test");
+            ehCacheFactoryBean.setCacheName("test2");
             ehCacheFactoryBean.setEternal(true);
             ehCacheFactoryBean.setTimeToIdle(0);
             ehCacheFactoryBean.setTimeToLive(0);
