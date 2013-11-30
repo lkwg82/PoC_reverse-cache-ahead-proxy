@@ -4,7 +4,6 @@ import net.sf.ehcache.Ehcache;
 import net.sf.ehcache.Element;
 import net.sf.ehcache.constructs.blocking.CacheEntryFactory;
 import net.sf.ehcache.constructs.blocking.SelfPopulatingCache;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -88,13 +87,6 @@ public class CacheSelfPopulatingTest {
 
     @Autowired
     private Ehcache backingCache;
-
-    @Autowired private CacheManager cacheManager;
-
-    @Before
-    public void setUp() throws Exception {
-        backingCache.removeAll();
-    }
 
     @Test
     public void testSelfLoadingCache() {
