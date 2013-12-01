@@ -107,12 +107,13 @@ public class CamelWithProxyCacheTest {
             return new RouteBuilder() {
                 public void configure() {
                     final String webserver = "jetty:http://localhost:1800?bridgeEndpoint=true&throwExceptionOnFailure=false&matchOnUriPrefix=true";
-                    final String reverseProxyDirect = "jetty:http://localhost:1801?matchOnUriPrefix=true";
-                    final String reverseProxyCaching = "jetty:http://localhost:1802?matchOnUriPrefix=true";
 
                     // the actual reverse-proxy
-                    from(reverseProxyDirect).setHeader("X-REVERSE", constant(1)).to(webserver);
-                    from(reverseProxyCaching).setHeader("X-Caching", constant(true)).beanRef("cache");
+                    from("jetty:http://localhost:1802?matchOnUriPrefix=true&chunked=false&disableStreamCache=false").setHeader("X-Caching", constant(true)).to("jetty:http://localhost:1801?bridgeEndpoint=true&throwExceptionOnFailure=false");
+
+                    from("jetty:http://localhost:1801?matchOnUriPrefix=true&chunked=false&disableStreamCache=false").setHeader("X-REVERSE", constant(1)).
+                            choice().when(header("X-Caching").isNotNull()).beanRef("cache").
+                            otherwise().to(webserver);
 
                     from(DIRECT_HTTP_CLIENT).to(webserver);
                     from(webserver).beanRef("webserver");
@@ -130,7 +131,6 @@ public class CamelWithProxyCacheTest {
                     HttpServletRequest request = in.getRequest();
                     HttpServletResponse response = in.getResponse();
 
-                    boolean overProxy = in.getHeader("X-REVERSE") != null;
                     TimeUnit.SECONDS.sleep(1);
 
                     if (request.getRequestURI().startsWith("/notfound")) {
@@ -139,8 +139,6 @@ public class CamelWithProxyCacheTest {
                     } else {
                         in.setBody("ok");
                     }
-
-                    in.setHeader("X-REVERSE", overProxy);
                 }
             };
         }
@@ -205,32 +203,6 @@ public class CamelWithProxyCacheTest {
             }
         }
 
-        public class ServiceBean {
-
-            private final Ehcache ehcache;
-
-            public ServiceBean(Ehcache ehcache) {
-                this.ehcache = ehcache;
-            }
-
-            @Handler
-            public void process(@Header(Exchange.HTTP_URI) String requestURI,
-                                @Header(Exchange.HTTP_METHOD) String method,
-                                Exchange exchange) throws Exception {
-
-                RequestCacheKey key = new RequestCacheKey(method, requestURI);
-                Element element = ehcache.get(key);
-
-                HttpResponse httpResponse = (HttpResponse) element.getObjectValue();
-
-                Message out = exchange.getOut();
-                out.setHeaders(httpResponse.getHeaders());
-                out.setBody(httpResponse.getBody(), CharSequence.class);
-
-                out.setHeader("X-HITS", element.getHitCount());
-                out.setHeader("X-CACHE-KEY", key.toString());
-            }
-        }
 
         class HTTPClientBean {
             @EndpointInject(uri = DIRECT_HTTP_CLIENT)
@@ -270,6 +242,33 @@ public class CamelWithProxyCacheTest {
                     }
                 }
             };
+        }
+
+        public class ServiceBean {
+
+            private final Ehcache ehcache;
+
+            public ServiceBean(Ehcache ehcache) {
+                this.ehcache = ehcache;
+            }
+
+            @Handler
+            public void process(@Header(Exchange.HTTP_URI) String requestURI,
+                                @Header(Exchange.HTTP_METHOD) String method,
+                                Exchange exchange) throws Exception {
+
+                RequestCacheKey key = new RequestCacheKey(method, requestURI);
+                Element element = ehcache.get(key);
+
+                HttpResponse httpResponse = (HttpResponse) element.getObjectValue();
+
+                Message out = exchange.getOut();
+                out.setHeaders(httpResponse.getHeaders());
+                out.setBody(httpResponse.getBody(), CharSequence.class);
+
+                out.setHeader("X-HITS", element.getHitCount());
+                out.setHeader("X-CACHE-KEY", key.toString());
+            }
         }
 
         @Bean(name = "cache")
