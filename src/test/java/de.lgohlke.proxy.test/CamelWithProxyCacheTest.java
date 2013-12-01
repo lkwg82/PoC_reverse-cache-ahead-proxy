@@ -9,7 +9,6 @@ import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.http.HttpMessage;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.spring.javaconfig.SingleRouteCamelConfiguration;
-import org.apache.camel.util.ExchangeHelper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +25,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
@@ -79,6 +79,7 @@ public class CamelWithProxyCacheTest {
             ehCacheFactoryBean.setTimeToLive(0);
             ehCacheFactoryBean.setDiskPersistent(false);
             ehCacheFactoryBean.setOverflowToDisk(false);
+//            ehCacheFactoryBean.setStatisticsEnabled(true);
             return ehCacheFactoryBean;
         }
 
@@ -186,7 +187,25 @@ public class CamelWithProxyCacheTest {
             }
         }
 
-        class ServiceBean implements Processor {
+        class HttpResponse {
+            private final Map<String, Object> headers;
+            private final CharSequence body;
+
+            HttpResponse(Map<String, Object> headers, CharSequence body) {
+                this.headers = headers;
+                this.body = body;
+            }
+
+            Map<String, Object> getHeaders() {
+                return headers;
+            }
+
+            CharSequence getBody() {
+                return body;
+            }
+        }
+
+        public class ServiceBean {
 
             private final Ehcache ehcache;
 
@@ -194,55 +213,63 @@ public class CamelWithProxyCacheTest {
                 this.ehcache = ehcache;
             }
 
-            @Override
-            public void process(Exchange exchange) throws Exception {
-                final HttpMessage httpMessage = exchange.getIn(HttpMessage.class);
+            @Handler
+            public void process(@Header(Exchange.HTTP_URI) String requestURI,
+                                @Header(Exchange.HTTP_METHOD) String method,
+                                Exchange exchange) throws Exception {
 
-                final HttpServletRequest request = httpMessage.getRequest();
-                final String requestURI = request.getRequestURI();
-                final String method = request.getMethod();
-
-                final RequestCacheKey key = new RequestCacheKey(method, requestURI);
+                RequestCacheKey key = new RequestCacheKey(method, requestURI);
                 Element element = ehcache.get(key);
 
-                final Exchange objectValue = (Exchange) element.getObjectValue();
-                ExchangeHelper.copyResults(exchange, objectValue);
+                HttpResponse httpResponse = (HttpResponse) element.getObjectValue();
 
-                exchange.getOut().setHeader("X-HITS", element.getHitCount());
-                exchange.getOut().setHeader("X-CACHE-KEY", key.toString());
+                Message out = exchange.getOut();
+                out.setHeaders(httpResponse.getHeaders());
+                out.setBody(httpResponse.getBody(), CharSequence.class);
+
+                out.setHeader("X-HITS", element.getHitCount());
+                out.setHeader("X-CACHE-KEY", key.toString());
             }
         }
 
-        class HTTPClientBean implements CacheEntryFactory {
+        class HTTPClientBean {
             @EndpointInject(uri = DIRECT_HTTP_CLIENT)
             private Endpoint httpEndpoint;
 
             @Produce(uri = DIRECT_HTTP_CLIENT)
             private ProducerTemplate httpProducer;
 
-            @Override
-            public Object createEntry(Object key) throws Exception {
-                if (key instanceof RequestCacheKey) {
-                    return forwardRequest((RequestCacheKey) key);
-                } else {
-                    throw new IllegalArgumentException("can not handle non-string key");
-                }
-            }
+            private HttpResponse doRequest(String method, String uri) throws Exception {
+                Exchange exchange = httpEndpoint.createExchange(ExchangePattern.InOut);
 
-            private Exchange forwardRequest(RequestCacheKey requestCacheKey) throws Exception {
-                final Exchange exchange = httpEndpoint.createExchange();
-
-                exchange.getIn().setHeader(Exchange.HTTP_URI, requestCacheKey.getRequestUri());
-                exchange.getIn().setHeader(Exchange.HTTP_METHOD, requestCacheKey.getMethod());
+                exchange.getIn().setHeader(Exchange.HTTP_METHOD, method);
+                exchange.getIn().setHeader(Exchange.HTTP_URI, uri);
 
                 httpProducer.send(exchange);
-                return exchange;
+
+                Message out = exchange.getOut();
+                return new HttpResponse(out.getHeaders(), out.getBody(CharSequence.class));
             }
         }
 
         @Bean
-        HTTPClientBean cacheEntryFactory() {
+        HTTPClientBean httpClientBean() {
             return new HTTPClientBean();
+        }
+
+        @Bean
+        CacheEntryFactory cacheEntryFactory(final HTTPClientBean httpClientBean) {
+            return new CacheEntryFactory() {
+                @Override
+                public Object createEntry(Object key) throws Exception {
+                    if (key instanceof RequestCacheKey) {
+                        final RequestCacheKey requestCacheKey = (RequestCacheKey) key;
+                        return httpClientBean.doRequest(requestCacheKey.getMethod(), requestCacheKey.getRequestUri());
+                    } else {
+                        throw new IllegalArgumentException("can not handle key");
+                    }
+                }
+            };
         }
 
         @Bean(name = "cache")
